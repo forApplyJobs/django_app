@@ -1,0 +1,332 @@
+{% extends 'base.html' %}
+
+{% block title %}Frame Detail: {{ frame.name }} - Frame Manager{% endblock %}
+
+{% block content %}
+<!-- DEBUG: Template Variables -->
+<div class="alert alert-info">
+    <strong>DEBUG INFO:</strong><br>
+    Frame Name: "{{ frame.name }}"<br>
+    Frame ID: {{ frame.id }}<br>
+    Created: "{{ frame.created_at }}"<br>
+    Feed URL: "{{ frame.xmlFeedPath }}"
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0"><i class="fas fa-info-circle me-2"></i>
+            {{frame.name|default:"No Name" }}</h1>
+        <p class="text-muted mb-0">Frame details and generated outputs</p>
+    </div>
+    <div>
+        <a href="{% url 'preview_frame' frame.id %}"
+            class="btn btn-primary me-2">
+            <i class="fas fa-eye me-1"></i>Preview & Edit
+        </a>
+        <a href="{% url 'frame_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Frames
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Frame Information -->
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-image me-2"></i>Frame
+                    Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <img src="{{ frame.image.url }}" alt="Frame"
+                        class="img-fluid rounded shadow-sm"
+                        style="max-width: 200px;">
+                </div>
+
+                <div class="row">
+                    <div class="col-4 text-muted small">Name:</div>
+                    <div class="col-8"><strong>
+                            {{frame.name|default:"Unknown"}}</strong></div>
+                </div>
+
+                <div class="row">
+                    <div class="col-4 text-muted small">Feed URL:</div>
+                    <div class="col-8">
+                        {% if frame.xmlFeedPath %}
+                        <small class="text-break">
+                            {{frame.xmlFeedPath|truncatechars:40 }}</small>
+                        <a href="{{ frame.xmlFeedPath }}" target="_blank"
+                            class="btn btn-sm btn-outline-primary ms-1">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                        {% else %}
+                        <span class="text-muted">No URL</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <hr class="my-2">
+
+                <div class="row">
+                    <div class="col-sm-6">
+                        <strong><i
+                                class="fas fa-crosshairs me-2"></i>Coordinates:</strong>
+                        {% if frame.coordinates %}
+                        X: {{ frame.coordinates.x }},
+                        Y: {{frame.coordinates.y }},
+                        W: {{frame.coordinates.width }},
+                        H: {{frame.coordinates.height }}
+                        {% else %}
+                        <span class="text-muted">Not configured yet</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Output Images -->
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div
+                class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-images me-2"></i>Generated
+                    Output Images</h5>
+                <span class="badge bg-light text-dark">{{ frame.outputs.count }}
+                    images</span>
+            </div>
+            <div class="card-body">
+                {% if frame.outputs.count > 0 %}
+                <div
+                    class="d-flex justify-content-between align-items-center mb-3">
+                </div>
+                <div class="table-responsive">
+                    <table id="outputs-table" class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><i class="fas fa-barcode me-1"></i>Product
+                                    ID</th>
+                                <th><i class="fas fa-image me-1"></i>Output
+                                    Image</th>
+                                <th><i class="fas fa-calendar me-1"></i>Created
+                                    At</th>
+                                <th><i class="fas fa-cogs me-1"></i>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be loaded via AJAX -->
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No output images yet</h5>
+                    <p class="text-muted">
+                        {% if not frame.coordinates %}
+                        Set coordinates first, then generate images.
+                        {% else %}
+                        Images are being generated in the background.
+                        {% endif %}
+                    </p>
+                    <a href="{% url 'preview_frame' frame.id %}"
+                        class="btn btn-primary">
+                        <i class="fas fa-magic me-1"></i>Generate Images
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if frame.outputs.count > 0 %}
+<!-- Add CSRF token meta tag -->
+<meta name="csrf-token" content="{{ csrf_token }}">
+<script>
+$(document).ready(function() {
+    $('#outputs-table').DataTable({
+        "processing": true,
+        "serverSide": true,
+        "pageLength": 5,
+        "lengthMenu": [5, 10, 20, 50],
+        "responsive": true,
+        "ajax": {
+            "url": "{% url 'frame_outputs_ajax' frame.id %}",
+            "type": "GET"
+        },
+        "columns": [
+            { 
+                "data": "product_id",
+                "render": function(data, type, row) {
+                    return '<code class="text-primary">' + data + '</code>';
+                }
+            },
+            { 
+                "data": "image_url",
+                "render": function(data, type, row) {
+                    if (data) {
+                        return '<div class="text-center">' +
+                               '<img src="' + data + '" alt="Output" class="img-thumbnail" style="max-width: 80px; cursor: pointer;" ' +
+                               'onclick="showImageModal(\'' + data + '\', \'' + row.product_id + '\')">' +
+                               '</div>';
+                    }
+                    return '<span class="text-muted">No image</span>';
+                },
+                "orderable": false
+            },
+            { 
+                "data": "created_at",
+                "render": function(data, type, row) {
+                    return '<small class="text-muted">' + data + '</small>';
+                }
+            },
+            { 
+                "data": null,
+                "render": function(data, type, row) {
+                    let buttons = '<div class="btn-group btn-group-sm" role="group">';
+                    
+                    // Download button
+                    if (row.image_url) {
+                        buttons += '<button type="button" class="btn btn-outline-success" ' +
+                                  'onclick="downloadOutput(\'' + row.image_url + '\', \'' + row.product_id + '\')" ' +
+                                  'title="Download Output">' +
+                                  '<i class="fas fa-download"></i>' +
+                                  '</button>';
+                    }
+                    
+                    // Delete button
+                    buttons += '<button type="button" class="btn btn-outline-danger" ' +
+                              'onclick="deleteOutput(' + row.id + ', \'' + row.product_id + '\')" ' +
+                              'title="Delete Output">' +
+                              '<i class="fas fa-trash"></i>' +
+                              '</button>';
+                    
+                    buttons += '</div>';
+                    return buttons;
+                },
+                "orderable": false,
+                "width": "100px"
+            }
+        ],
+        "language": {
+            "search": "Search Product:",
+            "lengthMenu": "Per page _MENU_ images",
+            "info": "_TOTAL_ images showing _START_ - _END_",
+            "processing": '<i class="fas fa-spinner fa-spin"></i> Loading...',
+            "emptyTable": "No images found",
+            "zeroRecords": "No matching records found",
+            "paginate": {
+                "first": "First",
+                "last": "Last",
+                "next": "Next",
+                "previous": "Previous"
+            }
+        }
+    });
+});
+
+// Get CSRF token function
+function getCSRFToken() {
+    return document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || 
+           document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+           '{{ csrf_token }}';
+}
+
+function showImageModal(imageUrl, productId) {
+    const modal = `
+        <div class="modal fade" id="imageModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Product: ${productId}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <img src="${imageUrl}" alt="Product ${productId}" class="img-fluid">
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    $('#imageModal').remove();
+    
+    // Add new modal
+    $('body').append(modal);
+    $('#imageModal').modal('show');
+}
+
+function downloadOutput(imageUrl, productId) {
+    // Create a temporary anchor element for download
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `output_${productId}_${Date.now()}.png`;
+    link.target = '_blank';
+    
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Show success message
+    showToast('success', `Output for ${productId} download started!`);
+}
+
+function deleteOutput(outputId, productId) {
+    // Show confirmation dialog
+    if (confirm(`Are you sure you want to delete the output for product "${productId}"?\n\nThis action cannot be undone.`)) {
+        // Show loading state
+        showToast('info', 'Deleting output...');
+        
+        // Make AJAX request to delete
+        $.ajax({
+            url: "{% url 'delete_output' 0 %}".replace('0', outputId),
+            type: 'POST',
+            headers: {
+                'X-CSRFToken': getCSRFToken(),
+                'Content-Type': 'application/json'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Reload the datatable
+                    $('#outputs-table').DataTable().ajax.reload();
+                    showToast('success', `Output for ${productId} deleted successfully!`);
+                } else {
+                    showToast('error', response.message || 'Error deleting output');
+                }
+            },
+            error: function(xhr, status, error) {
+                showToast('error', 'Error deleting output: ' + error);
+            }
+        });
+    }
+}
+
+function showToast(type, message) {
+    // Simple toast notification
+    const toastClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    
+    const toast = `
+        <div class="alert ${toastClass} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; max-width: 300px;">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('body').append(toast);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(function() {
+        $('.alert:last').alert('close');
+    }, 3000);
+}
+</script>
+{% endif %}
+{% endblock %}

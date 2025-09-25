@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+
+{% block title %}Frame List - Frame Manager{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-0"><i class="fas fa-images me-2"></i>My Frames</h1>
+        <p class="text-muted mb-0">Manage your frame templates and generated outputs</p>
+    </div>
+    <div>
+        <a href="{% url 'add_frame' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i>Add New Frame
+        </a>
+    </div>
+</div>
+
+{% if frames %}
+<div class="row">
+    {% for frame in frames %}
+    <div class="col-lg-4 col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="position-relative">
+                <img src="{{ frame.image.url }}" alt="{{ frame.name }}" 
+                     class="card-img-top" style="height: 200px; object-fit: cover;">
+                <div class="position-absolute top-0 end-0 m-2">
+                    <span class="badge bg-primary">
+                        {{ frame.outputs.count }} outputs
+                    </span>
+                </div>
+            </div>
+            
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title">
+                    <i class="fas fa-image me-2 text-primary"></i>
+                    {{ frame.name }}
+                </h5>
+                
+                <div class="mb-3 flex-grow-1">
+                    <div class="row mb-2">
+                        <div class="col-4 text-muted small">Feed URL:</div>
+                        <div class="col-8">
+                            <small class="text-break">
+                                {{ frame.xmlFeedPath|truncatechars:30 }}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-4 text-muted small">Created:</div>
+                        <div class="col-8">
+                            <small class="text-muted">
+                                {{ frame.created_at|date:"M d, Y" }}
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-4 text-muted small">Status:</div>
+                        <div class="col-8">
+                            {% if frame.coordinates %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-check me-1"></i>Configured
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>Setup Required
+                                </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'frame_detail' frame.id %}" 
+                           class="btn btn-outline-primary">
+                            <i class="fas fa-info-circle me-1"></i>Details
+                        </a>
+                        <a href="{% url 'preview_frame' frame.id %}" 
+                           class="btn btn-primary">
+                            <i class="fas fa-eye me-1"></i>Preview
+                        </a>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <a href="{% url 'edit_frame' frame.id %}" 
+                           class="btn btn-outline-warning btn-sm">
+                            <i class="fas fa-edit me-1"></i>Edit
+                        </a>
+                        <button type="button" 
+                                class="btn btn-outline-danger btn-sm"
+                                onclick="deleteFrame({{ frame.id }}, '{{ frame.name }}')">
+                            <i class="fas fa-trash me-1"></i>Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card-footer bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-link me-1"></i>
+                        <a href="{{ frame.xmlFeedPath }}" target="_blank" 
+                           class="text-decoration-none">
+                            View Feed
+                        </a>
+                    </small>
+                    {% if frame.coordinates %}
+                        <small class="text-success">
+                            <i class="fas fa-crosshairs me-1"></i>
+                            {{ frame.coordinates.width }}x{{ frame.coordinates.height }}
+                        </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Statistics Card -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h4 class="text-primary">{{ frames.count }}</h4>
+                            <small class="text-muted">Total Frames</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h4 class="text-success">
+                                {% with configured=frames|length %}
+                                    {% for frame in frames %}
+                                        {% if frame.coordinates %}{{ forloop.counter }}{% endif %}
+                                    {% endfor %}
+                                {% endwith %}
+                            </h4>
+                            <small class="text-muted">Configured</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="border-end">
+                            <h4 class="text-info">
+                                {% with total_outputs=0 %}
+                                    {% for frame in frames %}
+                                        {{ frame.outputs.count|add:total_outputs }}
+                                    {% endfor %}
+                                {% endwith %}
+                            </h4>
+                            <small class="text-muted">Total Outputs</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-warning">
+                            <i class="fas fa-clock"></i>
+                        </h4>
+                        <small class="text-muted">Active Processing</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="fas fa-images fa-4x text-muted mb-3"></i>
+        <h3 class="text-muted">No Frames Yet</h3>
+        <p class="text-muted">Create your first frame to get started with generating output images.</p>
+    </div>
+    
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        Getting Started
+                    </h5>
+                    <ol class="text-start">
+                        <li>Upload a frame template image</li>
+                        <li>Provide an XML feed URL</li>
+                        <li>Set product placement coordinates</li>
+                        <li>Generate output images automatically</li>
+                    </ol>
+                    <a href="{% url 'add_frame' %}" class="btn btn-primary">
+                        <i class="fas fa-plus me-1"></i>Create Your First Frame
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function deleteFrame(frameId, frameName) {
+    if (confirm(`Are you sure you want to delete the frame "${frameName}"?\n\nThis will also delete all generated output images.\nThis action cannot be undone.`)) {
+        // Show loading state
+        const deleteBtn = event.target;
+        const originalHtml = deleteBtn.innerHTML;
+        deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        deleteBtn.disabled = true;
+        
+        // Create form and submit
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/frame/${frameId}/delete/`;
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                         '{{ csrf_token }}';
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

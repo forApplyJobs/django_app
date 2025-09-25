@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete Frame: {{ frame.name }} - Frame Manager{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Delete
+                </h4>
+                <small>This action cannot be undone</small>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <h5><i class="fas fa-trash me-2"></i>You are about to delete:</h5>
+                    <p class="mb-2"><strong>Frame:</strong> {{ frame.name }}</p>
+                    <p class="mb-2"><strong>Output Images:</strong> {{ frame.outputs.count }} images</p>
+                    <p class="mb-0"><strong>Created:</strong> {{ frame.created_at|date:"M d, Y H:i" }}</p>
+                </div>
+
+                <!-- Frame Preview -->
+                <div class="text-center mb-4">
+                    <img src="{{ frame.image.url }}" alt="{{ frame.name }}" 
+                         class="img-thumbnail border-danger" style="max-width: 200px;">
+                </div>
+
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-exclamation-circle me-1"></i>What will be deleted:</h6>
+                    <ul class="mb-0">
+                        <li>The frame template and all its settings</li>
+                        <li>All {{ frame.outputs.count }} generated output images</li>
+                        <li>All coordinate configurations</li>
+                        <li>All related files from the server</li>
+                    </ul>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            <i class="fas fa-trash me-1"></i>
+                            Yes, Delete "{{ frame.name }}" Permanently
+                        </button>
+                        <div class="btn-group">
+                            <a href="{% url 'frame_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Cancel & Back to Frames
+                            </a>
+                            <a href="{% url 'frame_detail' frame.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-info-circle me-1"></i>View Details First
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add confirmation on form submit
+document.querySelector('form').addEventListener('submit', function(e) {
+    const confirmed = confirm('FINAL WARNING: This will permanently delete "{{ frame.name }}" and all its data.\n\nAre you absolutely sure?');
+    if (!confirmed) {
+        e.preventDefault();
+        return false;
+    }
+    
+    // Show loading state
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Deleting...';
+    submitBtn.disabled = true;
+});
+</script>
+{% endblock %}
