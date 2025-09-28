@@ -1,6 +1,6 @@
-# Django Image Processing & Feed Management Application
+# Django Image Processing & Feed Management Application with WebSockets
 
-This project is a Django-based image processing and feed management application. The main purpose of the project is to automatically add frames to products in XML feeds.
+This project is a Django-based image processing and feed management application with real-time WebSocket progress updates. The main purpose of the project is to automatically add frames to products in XML feeds with live progress tracking.
 
 ## 🚀 Features
 
@@ -9,16 +9,19 @@ This project is a Django-based image processing and feed management application.
 - **XML Feed Processing**: Automatic feed parsing and product image fetching
 - **Coordinate Configuration**: Interactive product positioning in preview screen
 - **Bulk Image Generation**: Background processing with Celery
+- **Real-time Progress Updates**: WebSocket-based live progress tracking
 - **DataTable Management**: Server-side pagination and search functionality
 - **Image Download/Delete**: Manage generated outputs
 - **Frame CRUD Operations**: Create, read, update, delete frames
-- **Real-time Preview**: Interactive coordinate adjustment with drag & resize
+- **Interactive Preview**: Drag & resize coordinates with real-time preview
 
 ## 🛠️ Technology Stack
 
 - **Backend**: Django 4.2.7
 - **Image Processing**: Pillow (PIL)
 - **Background Jobs**: Celery + Redis
+- **WebSockets**: Django Channels + Redis Channel Layer
+- **ASGI Server**: Daphne (required for WebSocket support)
 - **Frontend**: Bootstrap 5, jQuery, DataTables
 - **Database**: SQLite (for development)
 
@@ -64,26 +67,68 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-### 7. Start Redis Server
+### 7. Start Redis Server (Required for Celery and WebSockets)
 ```bash
 # Windows (Redis for Windows required)
 redis-server
+
 # Linux/Mac
 sudo service redis-server start
+# or
+sudo systemctl start redis-server
+
+# macOS with Homebrew
+brew services start redis
 ```
 
-### 8. Start Celery Worker
+### 8. Start Celery Worker (Background Processing)
 Open new terminal:
 ```bash
 cd django_app
 venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
 celery -A project worker --loglevel=info
 ```
 
-### 9. Start Django Server
+### 9. Start Django with Daphne (WebSocket Support)
+**Important**: Use Daphne instead of regular Django dev server for WebSocket support:
 ```bash
-python manage.py runserver
+# Start with Daphne (required for WebSockets)
+daphne project.asgi:application
+
+# For specific host/port
+daphne -b 127.0.0.1 -p 8000 project.asgi:application
+
+# For production with external access
+daphne -b 0.0.0.0 -p 8000 project.asgi:application
 ```
+
+**Note**: Do NOT use `python manage.py runserver` as it doesn't support WebSockets!
+
+## 🌐 WebSocket Features
+
+### Real-time Progress Updates
+When processing XML feeds, the application provides live progress updates via WebSockets:
+
+- **Connection**: `ws://localhost:8000/ws/progress/{frame_id}/`
+- **Authentication**: Requires user login
+- **Progress Data**: 
+  ```json
+  {
+    "processed": 15,
+    "total": 100,
+    "product_id": "current_processing_id"
+  }
+  ```
+- **Error Handling**: Real-time error notifications
+- **Auto-reload**: Page refreshes when processing completes
+
+### WebSocket Configuration
+The application includes:
+- **ASGI Configuration**: `project/asgi.py` with WebSocket routing
+- **Channel Layers**: Redis-based channel layer for WebSocket communication
+- **Consumer**: `app/consumers.py` handles WebSocket connections
+- **Routing**: `app/routing.py` defines WebSocket URL patterns
 
 ## 🎯 Usage
 
@@ -98,25 +143,45 @@ python manage.py runserver
 - Enter XML Feed URL: `https://cdn.goanalytix.io/assets/casestudy/CaseStudyFeed.xml`
 
 ### 3. Coordinate Configuration
+- Click "Preview & Edit" on your frame
 - Adjust product image position in preview screen
+- Use drag & drop or manual coordinate input
 - Set X, Y coordinates and dimensions
 - See result with real-time preview
 - Save with "Save & Generate Images"
 
-### 4. Bulk Processing
-- System automatically applies frame to all feed products
-- Performant processing with background processing
-- Progress can be tracked
+### 4. Real-time Processing
+- After saving coordinates, processing starts automatically
+- **Live progress bar** shows current status
+- **WebSocket updates** provide real-time feedback:
+  - Number of processed items
+  - Total items to process
+  - Currently processing product ID
+  - Error notifications if issues occur
+- Page automatically refreshes when complete
 
 ### 5. Output Management
 - View generated images on Frame Details page
 - Search and pagination with DataTable
-- Download and delete operations
+- Download individual images
+- Delete unwanted outputs
+- Real-time table updates
 
-### 6. Frame Management
-- Edit frame information and settings
-- Delete frames with confirmation
-- View frame statistics and status
+## 🔧 Technical Details
+
+### ASGI vs WSGI
+- **WSGI** (traditional): HTTP only, no WebSocket support
+- **ASGI** (this app): HTTP + WebSocket support via Daphne
+
+### WebSocket Architecture
+```
+Frontend (JavaScript) ←→ Daphne ←→ Django Channels ←→ Redis ←→ Celery Tasks
+```
+
+### Required Services
+1. **Redis Server**: Message broker + WebSocket channel layer
+2. **Celery Worker**: Background image processing
+3. **Daphne Server**: ASGI server with WebSocket support
 
 ## 📁 Project Structure
 
@@ -131,12 +196,15 @@ django_app/
 │   ├── templates/         # HTML templates
 │   ├── models.py         # Database models
 │   ├── views.py          # View functions
-│   ├── tasks.py          # Celery tasks
+│   ├── tasks.py          # Celery tasks with WebSocket updates
+│   ├── consumers.py      # WebSocket consumers
+│   ├── routing.py        # WebSocket URL routing
 │   ├── utils.py          # Helper functions
 │   └── forms.py          # Django forms
 │
 ├── project/              # Django project settings
-│   ├── settings.py       # Main settings
+│   ├── settings.py       # Main settings + Channels config
+│   ├── asgi.py          # ASGI configuration with WebSockets
 │   ├── urls.py          # URL routing
 │   └── celery.py        # Celery configuration
 │
@@ -145,8 +213,9 @@ django_app/
 └── README.md            # This file
 ```
 
-## 🔧 API Endpoints
+## 🔧 API Endpoints & WebSockets
 
+### HTTP Endpoints
 - `/` - Home page (Frame list)
 - `/login/` - User login
 - `/register/` - User registration
@@ -154,9 +223,12 @@ django_app/
 - `/frame/<id>/preview/` - Coordinate configuration
 - `/frame/<id>/edit/` - Edit frame
 - `/frame/<id>/delete/` - Delete frame
-- `/frame_detail/<id>/` - Frame details
+- `/frame_detail/<id>/` - Frame details with progress
 - `/frame/<id>/outputs-ajax/` - DataTable AJAX
 - `/delete_output/<id>/` - Delete output
+
+### WebSocket Endpoints
+- `/ws/progress/{frame_id}/` - Real-time progress updates
 
 ## 🎨 XML Feed Structure
 
@@ -175,39 +247,56 @@ The application supports the following XML structure:
 
 ## 🚨 Important Notes
 
-1. **Redis Connection**: Redis server must be active for Celery to work
-2. **File Sizes**: Large images may increase processing time
-3. **Feed Access**: XML feed URLs must be accessible
-4. **Media Directory**: `media/` folder must have write permissions
-5. **Duplicate Handling**: System handles duplicate product IDs automatically
+### Running the Application
+1. **Always use Daphne**: `daphne project.asgi:application`
+2. **Never use**: `python manage.py runserver` (no WebSocket support)
+3. **Redis must be running** for both Celery and WebSockets
+4. **Celery worker must be active** for background processing
 
-## 🔧 Development Notes
+### Development vs Production
+```bash
+# Development
+daphne project.asgi:application
 
-- **Debug Mode**: Set `DEBUG=False` in production
-- **Database**: PostgreSQL recommended for production
-- **Static Files**: Use Nginx/Apache in production
-- **Logging**: Detailed logs in `django_frame.log` file
+# Production with specific binding
+daphne -b 0.0.0.0 -p 8000 project.asgi:application
 
-## 🆕 Recent Updates
+# With process management (systemd/supervisor recommended)
+daphne -b 127.0.0.1 -p 8000 project.asgi:application
+```
 
-- Added frame edit and delete functionality
-- Implemented interactive coordinate adjustment
-- Added Bootstrap styling throughout the application
-- Enhanced error handling and user feedback
-- Improved duplicate product ID handling
-- Added comprehensive form validation
+### Common Issues
+1. **WebSocket connection fails**: 
+   - Ensure using Daphne, not Django dev server
+   - Check Redis is running
+   - Verify ALLOWED_HOSTS includes your domain
 
-## 📝 License
+2. **Progress updates not working**: 
+   - Verify Celery worker is running
+   - Check Redis connectivity
+   - Ensure user is authenticated
 
-This project is prepared for educational purposes.
+3. **Image processing errors**: 
+   - Check file permissions in MEDIA_ROOT
+   - Verify XML feed accessibility
+   - Check disk space for output images
 
-## 🤝 Contributing
+### Performance Tips
+- **Redis Configuration**: Tune Redis memory settings for large feeds
+- **Image Processing**: Consider image size limits for better performance
+- **WebSocket Connections**: Monitor connection count in production
+- **Celery Workers**: Scale workers based on processing load
 
-1. Fork the project
-2. Create feature branch
-3. Commit your changes
-4. Send pull request
+## 📊 Monitoring & Logs
 
-## 📞 Support
+- **Application Logs**: `django_frame.log`
+- **Celery Logs**: Console output with `--loglevel=info`
+- **Redis Monitoring**: Use `redis-cli monitor`
+- **WebSocket Debug**: Browser Developer Tools → Network → WS
 
-You can open an issue for any questions.
+## 🔒 Security Notes
+
+- **WebSocket Authentication**: Users must be logged in
+- **Frame Ownership**: Users can only access their own frames
+- **CSRF Protection**: Enabled for all HTTP requests
+- **File Upload**: Limited to image files only
