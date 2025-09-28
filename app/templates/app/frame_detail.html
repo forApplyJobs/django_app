@@ -11,7 +11,14 @@
     Created: "{{ frame.created_at }}"<br>
     Feed URL: "{{ frame.xmlFeedPath }}"
 </div>
-
+<!-- Progress Bar --> 
+<div id="progress-container" class="mb-3" style="display: none;">
+    <label>Processing Progress:</label>
+    <div class="progress">
+        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+    </div>
+    <small id="progress-text" class="text-muted">Waiting to start...</small>
+</div>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <h1 class="mb-0"><i class="fas fa-info-circle me-2"></i>
@@ -143,10 +150,63 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if frame.outputs.count > 0 %}
+
 <!-- Add CSRF token meta tag -->
 <meta name="csrf-token" content="{{ csrf_token }}">
 <script>
+const frameId = {{ frame.id }};
+const progressContainer = document.getElementById("progress-container");
+const progressBar = document.getElementById("progress-bar");
+const progressText = document.getElementById("progress-text");
+
+// WebSocket progress update
+if ({{ frame.outputs.count }} == 0) {
+    progressContainer.style.display = "block";
+    const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${wsScheme}://${window.location.host}/ws/progress/${frameId}/`);
+
+
+    ws.onmessage = function(event) {
+
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message:", data);
+        if (data.error) {
+            // Hata geldi, progress bar'ı bitir ve mesaj göster
+            progressBar.style.width = "100%";
+            progressBar.textContent = "Error occurred!";
+            progressText.textContent = data.error;
+            progressBar.classList.remove("progress-bar-animated");
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+            return;
+        }
+
+        const percent = Math.round((data.processed / data.total) * 100);
+        progressBar.style.width = percent + "%";
+        progressBar.textContent = percent + "%";
+        progressText.textContent = `Processed ${data.processed} of ${data.total} products (Current: ${data.product_id})`;
+
+        if (data.processed >= data.total) {
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+            // İşlem tamamlandı, progress bar'ı bitir
+            progressBar.style.width = "100%";
+            progressBar.textContent = "100%";
+            progressText.textContent = "Processing complete!";
+            progressBar.classList.remove("progress-bar-animated");
+            setTimeout(() => {
+                location.reload();
+            }, 500);
+            return;
+        }
+    };
+
+
+    ws.onclose = function() { console.log("WebSocket connection closed"); };
+}
+{% if frame.outputs.count > 0 %}
 $(document).ready(function() {
     $('#outputs-table').DataTable({
         "processing": true,
@@ -306,7 +366,22 @@ function deleteOutput(outputId, productId) {
         });
     }
 }
-
+function reloadOutputsTable() {
+    $.ajax({
+        url: "{% url 'frame_outputs_ajax' frame.id %}",
+        type: 'GET',
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        },
+        success: function(response) {
+            // DataTable'ı tekrar yükle
+            $('#outputs-table').DataTable().clear().rows.add(response.data).draw(false);
+        },
+        error: function(xhr, status, error) {
+            showToast('error', 'Error reloading outputs table: ' + error);
+        }
+    });
+}
 function showToast(type, message) {
     // Simple toast notification
     const toastClass = type === 'success' ? 'alert-success' : 
@@ -327,6 +402,7 @@ function showToast(type, message) {
         $('.alert:last').alert('close');
     }, 3000);
 }
-</script>
+
 {% endif %}
+</script>
 {% endblock %}
