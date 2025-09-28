@@ -122,6 +122,10 @@ LOGGING = {
             'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
             'style': '{',
         },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
     },
     'handlers': {
         'console': {
@@ -129,10 +133,6 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
     },
     'loggers': {
         'django': {
@@ -145,6 +145,15 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'celery': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
 }
 
