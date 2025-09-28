@@ -43,13 +43,15 @@ cp .env.docker .env
 ```
 
 3. **Start all services**
-```bash
-# For production
-docker-compose up -d
 
-# For development (with hot reload)
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
+- **Production (with Nginx, static/media volumes, no auto-reload):**
+  ```bash
+  docker-compose up -d
+  ```
+- **Development (with hot reload, code sync, no Nginx):**
+  ```bash
+  docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+  ```
 
 4. **Access the application**
 - **Web Interface**: http://localhost:8000
@@ -60,8 +62,11 @@ docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ### Docker Commands
 
 ```bash
-# Start services
+# Start services (production)
 docker-compose up -d
+
+# Start services (development with hot reload)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # View logs
 docker-compose logs -f web
@@ -88,12 +93,19 @@ docker-compose up -d
 ### Production with Nginx
 
 ```bash
-# Start with Nginx proxy
+# Start with Nginx proxy (recommended for production)
 docker-compose --profile production up -d
 
 # Access via Nginx
 curl http://localhost/
 ```
+
+#### Notes
+
+- **.env file**: Always create and configure your `.env` file before running Docker Compose.
+- **Volumes**: Docker volumes are used for database, Redis, media, and outputs persistence.
+- **Nginx**: Only enabled in production profile. For local development, you can access the app directly via port 8000.
+- **Hot reload**: Only available in development mode (`docker-compose.dev.yml`).
 
 ## 📋 Local Development Installation
 
@@ -335,10 +347,10 @@ The application supports the following XML structure:
 
 ### Development vs Production
 ```bash
-# Development with Docker
+# Development with Docker (hot reload, code sync)
 docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# Production with Docker
+# Production with Docker (static/media volumes, Nginx, no reload)
 docker-compose up -d
 
 # Production with Nginx
