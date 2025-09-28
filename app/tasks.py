@@ -20,7 +20,7 @@ def overlay_images(frame_path, product_image_url, coordinates):
     width = int(coordinates.get('width', 100))
     height = int(coordinates.get('height', 100))
 
-    resized_product = product_image.resize((width, height), Image.ANTIALIAS)
+    resized_product = product_image.resize((width, height), Image.Resampling.LANCZOS)
     final_x = max(0, min(x, frame.size[0] - width))
     final_y = max(0, min(y, frame.size[1] - height))
     frame.paste(resized_product, (final_x, final_y), resized_product)
