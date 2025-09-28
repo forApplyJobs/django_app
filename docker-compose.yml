@@ -30,6 +30,7 @@ services:
     restart: unless-stopped
     volumes:
       - media_data:/app/media
+      - outputs_data:/app/outputs   # outputs için ayrı volume
     ports:
       - "8000:8000"
     environment:
@@ -47,7 +48,8 @@ services:
     build: .
     restart: unless-stopped
     volumes:
-      - media_data:/app/media
+      - media_data:/app/media       # media volume shared
+      - outputs_data:/app/outputs   # outputs volume shared
     environment:
       - DEBUG=${DEBUG:-False}
       - SECRET_KEY=${SECRET_KEY}
@@ -78,6 +80,7 @@ volumes:
   postgres_data:
   redis_data:
   media_data:
+  outputs_data:   # outputs için yeni volume
 
 networks:
   default:
