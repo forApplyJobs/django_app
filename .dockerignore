@@ -3,8 +3,7 @@
 README.md
 Dockerfile
 docker-compose*.yml
-.env
-.env.*
+.env.example
 __pycache__
 *.pyc
 *.pyo
@@ -19,4 +18,5 @@ logs/
 .coverage
 .pytest_cache
 node_modules/
+.DS_Store
 .DS_Store

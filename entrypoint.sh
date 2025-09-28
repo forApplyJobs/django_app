@@ -14,6 +14,9 @@ while ! nc -z redis 6379; do
 done
 echo "Redis started"
 
+# Create logs directory
+mkdir -p logs
+
 # Run migrations
 echo "Running migrations..."
 python manage.py migrate --noinput
@@ -23,7 +26,16 @@ echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
 # Create superuser if it doesn't exist
-echo "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123456')" | python manage.py shell
+echo "Creating superuser if it doesn't exist..."
+python manage.py shell << EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username='admin').exists():
+    User.objects.create_superuser('admin', 'admin@example.com', 'admin123456')
+    print('Superuser created: admin/admin123456')
+else:
+    print('Superuser already exists')
+EOF
 
 echo "Starting server..."
 exec "$@"

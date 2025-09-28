@@ -54,10 +54,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py collectstatic --noinput &&
-             daphne -b 0.0.0.0 -p 8000 project.asgi:application"
 
   # Celery Worker
   celery:
@@ -78,9 +74,13 @@ services:
         condition: service_healthy
     command: celery -A project worker --loglevel=info --concurrency=2
 
-  # Nginx (Optional - for production)
-  nginx:
-    image: nginx:alpine
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    driver: bridge
     restart: unless-stopped
     ports:
       - "80:80"
@@ -93,11 +93,3 @@ services:
       - web
     profiles:
       - production
-
-volumes:
-  postgres_data:
-  redis_data:
-
-networks:
-  default:
-    driver: bridge
