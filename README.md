@@ -18,14 +18,84 @@ This project is a Django-based image processing and feed management application 
 ## 🛠️ Technology Stack
 
 - **Backend**: Django 4.2.7
+- **Database**: PostgreSQL (Docker) / SQLite (Development)
 - **Image Processing**: Pillow (PIL)
 - **Background Jobs**: Celery + Redis
 - **WebSockets**: Django Channels + Redis Channel Layer
 - **ASGI Server**: Daphne (required for WebSocket support)
 - **Frontend**: Bootstrap 5, jQuery, DataTables
-- **Database**: SQLite (for development)
+- **Deployment**: Docker + Docker Compose
 
-## 📋 Installation
+## 🐳 Docker Deployment (Recommended)
+
+### Quick Start
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd django_app
+```
+
+2. **Create environment file**
+```bash
+cp .env.docker .env
+# Edit .env with your settings
+```
+
+3. **Start all services**
+```bash
+# For production
+docker-compose up -d
+
+# For development (with hot reload)
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+4. **Access the application**
+- **Web Interface**: http://localhost:8000
+- **Admin Panel**: http://localhost:8000/admin (admin/admin123456)
+- **Database**: localhost:5432
+- **Redis**: localhost:6379
+
+### Docker Commands
+
+```bash
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f web
+docker-compose logs -f celery
+
+# Run migrations
+docker-compose exec web python manage.py migrate
+
+# Create superuser
+docker-compose exec web python manage.py createsuperuser
+
+# Access Django shell
+docker-compose exec web python manage.py shell
+
+# Stop services
+docker-compose down
+
+# Rebuild and restart
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+### Production with Nginx
+
+```bash
+# Start with Nginx proxy
+docker-compose --profile production up -d
+
+# Access via Nginx
+curl http://localhost/
+```
+
+## 📋 Local Development Installation
 
 ### 1. Clone the Project
 ```bash
@@ -48,7 +118,7 @@ pip install -r requirements.txt
 ```
 
 ### 4. Set Environment Variables
-`.env` file is already available. Edit if necessary:
+Create `.env` file:
 ```env
 DJANGO_SETTINGS_MODULE=project.settings
 SECRET_KEY=xqm_&lp6bi_4vl4ebx11$v!lp^sl^+lrp5znckfoxj-^q3v&+k
@@ -133,7 +203,7 @@ The application includes:
 ## 🎯 Usage
 
 ### 1. System Access
-- Go to `http://127.0.0.1:8000/`
+- Go to `http://localhost:8000/` (Docker) or `http://127.0.0.1:8000/` (Local)
 - Register or login
 
 ### 2. Adding New Frame
@@ -179,9 +249,10 @@ Frontend (JavaScript) ←→ Daphne ←→ Django Channels ←→ Redis ←→ C
 ```
 
 ### Required Services
-1. **Redis Server**: Message broker + WebSocket channel layer
-2. **Celery Worker**: Background image processing
-3. **Daphne Server**: ASGI server with WebSocket support
+1. **Database**: PostgreSQL (Docker) or SQLite (Local)
+2. **Redis Server**: Message broker + WebSocket channel layer
+3. **Celery Worker**: Background image processing
+4. **Daphne Server**: ASGI server with WebSocket support
 
 ## 📁 Project Structure
 
@@ -208,9 +279,12 @@ django_app/
 │   ├── urls.py          # URL routing
 │   └── celery.py        # Celery configuration
 │
-├── requirements.txt      # Python dependencies
-├── manage.py            # Django management script
-└── README.md            # This file
+├── docker-compose.yml    # Docker services configuration
+├── Dockerfile           # Django app container
+├── nginx.conf          # Nginx configuration
+├── requirements.txt    # Python dependencies
+├── manage.py          # Django management script
+└── README.md          # This file
 ```
 
 ## 🔧 API Endpoints & WebSockets
@@ -247,7 +321,13 @@ The application supports the following XML structure:
 
 ## 🚨 Important Notes
 
-### Running the Application
+### Docker Deployment
+1. **Always use Docker for production**: Ensures consistency across environments
+2. **Environment variables**: Set proper values in `.env` file
+3. **Data persistence**: Volumes ensure data survives container restarts
+4. **Health checks**: Services wait for dependencies to be ready
+
+### Local Development
 1. **Always use Daphne**: `daphne project.asgi:application`
 2. **Never use**: `python manage.py runserver` (no WebSocket support)
 3. **Redis must be running** for both Celery and WebSockets
@@ -255,14 +335,14 @@ The application supports the following XML structure:
 
 ### Development vs Production
 ```bash
-# Development
-daphne project.asgi:application
+# Development with Docker
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# Production with specific binding
-daphne -b 0.0.0.0 -p 8000 project.asgi:application
+# Production with Docker
+docker-compose up -d
 
-# With process management (systemd/supervisor recommended)
-daphne -b 127.0.0.1 -p 8000 project.asgi:application
+# Production with Nginx
+docker-compose --profile production up -d
 ```
 
 ### Common Issues
@@ -276,12 +356,18 @@ daphne -b 127.0.0.1 -p 8000 project.asgi:application
    - Check Redis connectivity
    - Ensure user is authenticated
 
-3. **Image processing errors**: 
+3. **Database connection issues**:
+   - Check PostgreSQL is running (Docker)
+   - Verify DATABASE_URL environment variable
+   - Run migrations: `docker-compose exec web python manage.py migrate`
+
+4. **Image processing errors**: 
    - Check file permissions in MEDIA_ROOT
    - Verify XML feed accessibility
    - Check disk space for output images
 
 ### Performance Tips
+- **Docker Resources**: Allocate sufficient CPU and memory
 - **Redis Configuration**: Tune Redis memory settings for large feeds
 - **Image Processing**: Consider image size limits for better performance
 - **WebSocket Connections**: Monitor connection count in production
@@ -289,13 +375,35 @@ daphne -b 127.0.0.1 -p 8000 project.asgi:application
 
 ## 📊 Monitoring & Logs
 
-- **Application Logs**: `django_frame.log`
-- **Celery Logs**: Console output with `--loglevel=info`
-- **Redis Monitoring**: Use `redis-cli monitor`
-- **WebSocket Debug**: Browser Developer Tools → Network → WS
+### Docker Logs
+```bash
+# View all logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f web
+docker-compose logs -f celery
+docker-compose logs -f db
+docker-compose logs -f redis
+```
+
+### Application Logs
+- **Django Logs**: Available in container logs
+- **Celery Logs**: Available in container logs
+- **PostgreSQL Logs**: Available via `docker-compose logs db`
+- **Redis Logs**: Available via `docker-compose logs redis`
+
+### Health Monitoring
+- **Application**: http://localhost:8000/
+- **Database Health**: `docker-compose exec db pg_isready`
+- **Redis Health**: `docker-compose exec redis redis-cli ping`
 
 ## 🔒 Security Notes
 
+- **Environment Variables**: Never commit `.env` files to version control
+- **Database Passwords**: Use strong passwords in production
+- **Secret Key**: Generate new secret key for production
+- **HTTPS**: Enable SSL/TLS in production
 - **WebSocket Authentication**: Users must be logged in
 - **Frame Ownership**: Users can only access their own frames
 - **CSRF Protection**: Enabled for all HTTP requests
