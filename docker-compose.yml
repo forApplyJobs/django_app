@@ -74,13 +74,9 @@ services:
         condition: service_healthy
     command: celery -A project worker --loglevel=info --concurrency=2
 
-volumes:
-  postgres_data:
-  redis_data:
-
-networks:
-  default:
-    driver: bridge
+  # Nginx (Optional - for production)
+  nginx:
+    image: nginx:alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -93,3 +89,11 @@ networks:
       - web
     profiles:
       - production
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    driver: bridge
