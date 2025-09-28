@@ -25,24 +25,60 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . .
 
-# Create media directories
-RUN mkdir -p media/frames media/outputs logs
+# Create directories with proper permissions
+RUN mkdir -p media/frames media/outputs logs \
+    && chmod 755 media media/frames media/outputs logs
 
-# Make entrypoint executable
-COPY entrypoint.sh /entrypoint.sh
+# Create and set permissions for entrypoint
+RUN echo '#!/bin/bash\n\
+echo "Waiting for database..."\n\
+while ! nc -z db 5432; do\n\
+  sleep 0.1\n\
+done\n\
+echo "Database started"\n\
+\n\
+echo "Waiting for Redis..."\n\
+while ! nc -z redis 6379; do\n\
+  sleep 0.1\n\
+done\n\
+echo "Redis started"\n\
+\n\
+echo "Creating log directory and setting permissions..."\n\
+mkdir -p /app/logs\n\
+chmod 755 /app/logs\n\
+\n\
+echo "Running migrations..."\n\
+python manage.py migrate --noinput\n\
+\n\
+echo "Collecting static files..."\n\
+python manage.py collectstatic --noinput --clear\n\
+\n\
+echo "Creating superuser if not exists..."\n\
+python manage.py shell << EOF\n\
+from django.contrib.auth import get_user_model\n\
+User = get_user_model()\n\
+if not User.objects.filter(username="admin").exists():\n\
+    User.objects.create_superuser("admin", "admin@example.com", "admin123456")\n\
+    print("Superuser created: admin/admin123456")\n\
+else:\n\
+    print("Superuser already exists")\n\
+EOF\n\
+\n\
+echo "Starting server..."\n\
+exec "$@"' > /entrypoint.sh
+
 RUN chmod +x /entrypoint.sh
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser
+
+# Set ownership of all app files to appuser
 RUN chown -R appuser:appuser /app
+
 USER appuser
 
 # Expose port
 EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
 
 # Use entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
