@@ -82,6 +82,3 @@ volumes:
 networks:
   default:
     driver: bridge
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./media:/app/media:ro
-      - ./static:/app/static:ro
